@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+.aws-sam/
+venv/
+.venv/
+env.json

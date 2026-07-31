@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: GVMC Change-Detection Engine API
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        DB_URL: !Ref DbUrl
+        S3_BUCKET: !Ref S3Bucket
+        AWS_REGION: !Ref AWS::Region
+        BEDROCK_REGION: !Ref BedrockRegion
+        BEDROCK_EXPLAIN_MODEL_ID: !Ref BedrockExplainModelId
+        BEDROCK_CHAT_MODEL_ID: !Ref BedrockChatModelId
+        PIPELINE_EC2_INSTANCE_ID: !Ref PipelineEc2InstanceId
+        ENVIRONMENT: !Ref Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues: [staging, production]
+  DbUrl:
+    Type: String
+    NoEcho: true
+    Description: mysql+pymysql://user:pass@host:3306/gvmc
+  S3Bucket:
+    Type: String
+    Default: gvmc-sw14-data
+  BedrockRegion:
+    Type: String
+    Default: us-east-1
+    Description: Region where the Meta Llama Bedrock models are enabled (may differ from infra region)
+  BedrockExplainModelId:
+    Type: String
+    Default: us.meta.llama4-scout-17b-instruct-v1:0
+    Description: Cross-region inference profile id, not the bare model id — see README
+  BedrockChatModelId:
+    Type: String
+    Default: us.meta.llama3-3-70b-instruct-v1:0
+  PipelineEc2InstanceId:
+    Type: String
+    Default: ""
+    Description: Optional EC2 instance id running the Sentinel-2/OSM pipeline, for real /admin/refresh SSM trigger
+
+Resources:
+  GvmcApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      BinaryMediaTypes:
+        - multipart/form-data
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "gvmc-api-${Environment}"
+      Handler: lambda_function.handler
+      CodeUri: .
+      Description: GVMC change-detection REST API (single Lambda, regex router)
+      Events:
+        RestApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GvmcApi
+            Path: /{proxy+}
+            Method: ANY
+        OptionsApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GvmcApi
+            Path: /{proxy+}
+            Method: OPTIONS
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref S3Bucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "*"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:SendCommand
+              Resource: "*"
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL — set this as VITE_API_URL in Amplify
+    Value: !Sub "https://${GvmcApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
