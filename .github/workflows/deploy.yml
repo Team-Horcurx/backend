@@ -54,5 +54,5 @@ jobs:
             --no-fail-on-empty-changeset \
             --parameter-overrides \
               "Environment=staging" \
-              "DbUrl=mysql+pymysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ secrets.DB_HOST }}:3306/gvmc-db" \
+              "DbUrl=mysql+pymysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ secrets.DB_HOST }}:3306/gvmcdb" \
               "S3Bucket=${{ secrets.S3_BUCKET }}"
