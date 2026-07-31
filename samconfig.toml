@@ -8,6 +8,9 @@ resolve_s3 = true
 
 [staging.deploy.parameters]
 stack_name = "gvmc-api-staging"
+region = "ap-south-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
 parameter_overrides = "Environment=staging"
 
 [production.deploy.parameters]
