@@ -9,6 +9,8 @@ SET NAMES utf8mb4;
 CREATE TABLE IF NOT EXISTS wards (
   id          CHAR(8)      NOT NULL PRIMARY KEY,
   name        VARCHAR(100) NOT NULL,
+  zone        VARCHAR(50)  NULL,
+  pincode     CHAR(6)      NULL,
   bbox_north  DECIMAL(9,6) NOT NULL,
   bbox_south  DECIMAL(9,6) NOT NULL,
   bbox_east   DECIMAL(9,6) NOT NULL,
@@ -16,26 +18,45 @@ CREATE TABLE IF NOT EXISTS wards (
   geojson_s3  VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- `zone`/`pincode` and every column below from `address` through `owner_name`
+-- match frontend/src/mockData/gvmc_properties_mock.csv (bulk CSV import
+-- format); `baseline_year`/`comparison_year` are the satellite comparison
+-- pair used by the "from year -> to year" filter (see indexes below).
 CREATE TABLE IF NOT EXISTS properties (
-  id                    VARCHAR(36)  NOT NULL PRIMARY KEY,
-  ward_id               CHAR(8)      NOT NULL,
-  lat                   DECIMAL(9,6) NOT NULL,
-  lng                   DECIMAL(9,6) NOT NULL,
-  area_sqm              INT          NOT NULL,
-  detection_type        ENUM('new_build','change_of_use') NOT NULL,
-  confidence            DECIMAL(3,2) NOT NULL,
-  confidence_breakdown  JSON         NULL,
-  detected_at           DATETIME     NOT NULL,
-  s3_geojson_key        VARCHAR(255) NULL,
-  status                ENUM('pending','verified','underassessed','false_positive','already_assessed') NOT NULL DEFAULT 'pending',
-  notes                 TEXT         NULL,
-  updated_by            VARCHAR(100) NULL,
-  updated_at            DATETIME     NULL,
-  ai_explanation        TEXT         NULL,
+  id                       VARCHAR(36)  NOT NULL PRIMARY KEY,
+  ward_id                  CHAR(8)      NOT NULL,
+  lat                      DECIMAL(9,6) NOT NULL,
+  lng                      DECIMAL(9,6) NOT NULL,
+  address                  VARCHAR(150) NULL,
+  pincode                  CHAR(6)      NULL,
+  property_type            ENUM('Residential','Commercial','Mixed Use','Industrial','Vacant Land') NULL,
+  area_sqm                 INT          NOT NULL,
+  detection_type           ENUM('new_build','change_of_use') NOT NULL,
+  confidence               DECIMAL(3,2) NOT NULL,
+  confidence_breakdown     JSON         NULL,
+  ndbi_delta               DECIMAL(3,2) NULL,
+  area_delta               DECIMAL(3,2) NULL,
+  ndvi_drop                DECIMAL(3,2) NULL,
+  osm_status               DECIMAL(3,2) NULL,
+  db_match                 DECIMAL(3,2) NULL,
+  baseline_year            SMALLINT UNSIGNED NULL,
+  comparison_year          SMALLINT UNSIGNED NULL,
+  detected_at              DATETIME     NOT NULL,
+  s3_geojson_key           VARCHAR(255) NULL,
+  status                   ENUM('pending','verified','underassessed','false_positive','already_assessed') NOT NULL DEFAULT 'pending',
+  estimated_annual_tax_inr INT UNSIGNED NULL,
+  owner_name               VARCHAR(60)  NULL,
+  notes                    TEXT         NULL,
+  updated_by               VARCHAR(100) NULL,
+  updated_at               DATETIME     NULL,
+  ai_explanation           TEXT         NULL,
   CONSTRAINT fk_properties_ward FOREIGN KEY (ward_id) REFERENCES wards(id),
+  CONSTRAINT chk_properties_year_order CHECK (baseline_year IS NULL OR comparison_year IS NULL OR comparison_year >= baseline_year),
   INDEX idx_properties_ward (ward_id),
   INDEX idx_properties_ward_type (ward_id, detection_type),
-  INDEX idx_properties_ward_status (ward_id, status)
+  INDEX idx_properties_ward_status (ward_id, status),
+  INDEX idx_properties_years (baseline_year, comparison_year),
+  INDEX idx_properties_ward_years (ward_id, baseline_year, comparison_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS alerts (
