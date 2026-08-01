@@ -59,15 +59,28 @@ def _parse_csv_multipart(raw_bytes: bytes, content_type: str) -> list[dict]:
     rows = []
     for row in reader:
         rows.append({
-            "id": row.get("id") or str(uuid.uuid4()),
+            "id": row.get("property_id") or row.get("id") or str(uuid.uuid4()),
             "ward_id": row["ward_id"],
             "lat": float(row["lat"]),
             "lng": float(row["lng"]),
+            "address": row.get("address"),
+            "pincode": row.get("pincode"),
+            "property_type": row.get("property_type"),
             "area_sqm": int(float(row["area_sqm"])),
             "detection_type": row["detection_type"],
             "confidence": float(row["confidence"]),
             "confidence_breakdown": row.get("confidence_breakdown") or "{}",
+            "ndbi_delta": float(row["ndbi_delta"]) if row.get("ndbi_delta") else None,
+            "area_delta": float(row["area_delta"]) if row.get("area_delta") else None,
+            "ndvi_drop": float(row["ndvi_drop"]) if row.get("ndvi_drop") else None,
+            "osm_status": float(row["osm_status"]) if row.get("osm_status") else None,
+            "db_match": float(row["db_match"]) if row.get("db_match") else None,
+            "baseline_year": int(row["baseline_year"]) if row.get("baseline_year") else None,
+            "comparison_year": int(row["comparison_year"]) if row.get("comparison_year") else None,
             "detected_at": row.get("detected_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "s3_geojson_key": row.get("s3_geojson_key"),
+            "status": row.get("status") or "pending",
+            "estimated_annual_tax_inr": int(float(row["estimated_annual_tax_inr"])) if row.get("estimated_annual_tax_inr") else None,
+            "owner_name": row.get("owner_name"),
         })
     return rows

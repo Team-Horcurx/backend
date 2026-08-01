@@ -6,6 +6,7 @@ from stats.stats_service import StatsService
 from alerts.alerts_service import AlertsService
 from chat.chat_service import ChatService
 from admin.admin_service import AdminService
+from ndbi.ndbi_service import NdbiService
 
 _wards = WardsService()
 _props = PropertiesService()
@@ -13,11 +14,15 @@ _stats = StatsService()
 _alerts = AlertsService()
 _chat = ChatService()
 _admin = AdminService()
+_ndbi = NdbiService()
 
 # (METHOD, path_pattern, handler, param_names)
 ROUTES = [
     ("GET",  "/api/wards",                                     _wards.list_wards,      []),
     ("GET",  r"/api/wards/(?P<wardId>[^/]+)/changes",           _wards.get_changes,     ["wardId"]),
+    ("GET",  r"/api/wards/(?P<wardId>[^/]+)/years",             _wards.get_years,       ["wardId"]),
+    ("GET",  r"/api/wards/(?P<wardId>[^/]+)/ndbi",              _ndbi.get_grid,         ["wardId"]),
+    ("GET",  r"/api/wards/(?P<wardId>[^/]+)/comparison",        _stats.get_comparison,  ["wardId"]),
     ("GET",  r"/api/wards/(?P<wardId>[^/]+)/unassessed",        _props.list_for_ward,   ["wardId"]),
     ("GET",  r"/api/wards/(?P<wardId>[^/]+)/alerts",            _alerts.list_for_ward,  ["wardId"]),
 

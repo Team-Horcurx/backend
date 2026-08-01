@@ -28,3 +28,10 @@ class WardsService:
             raise ValueError("Ward not found")
         key = ward["geojson_s3"] or f"geojson/ward-{obj['wardId']}.json"
         return "success", {"presigned_url": presigned_get(key)}
+
+    def get_years(self, obj, conn):
+        ward = wards_modal.get_ward(conn, obj["wardId"])
+        if not ward:
+            raise LookupError("Ward not found")
+        pairs = wards_modal.list_distinct_year_pairs(conn, obj["wardId"])
+        return "success", {"ward_id": obj["wardId"], "pairs": pairs}

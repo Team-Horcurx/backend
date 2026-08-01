@@ -25,6 +25,9 @@ import re
 TEST_CASES = [
     ("GET", "/api/wards", {}),
     ("GET", "/api/wards/4/changes", {"wardId": "4"}),
+    ("GET", "/api/wards/4/years", {"wardId": "4"}),
+    ("GET", "/api/wards/4/ndbi", {"wardId": "4"}),
+    ("GET", "/api/wards/4/comparison", {"wardId": "4"}),
     ("GET", "/api/wards/4/unassessed", {"wardId": "4"}),
     ("GET", "/api/wards/4/alerts", {"wardId": "4"}),
     ("GET", "/api/properties/prop-w1-001", {"id": "prop-w1-001"}),
@@ -92,7 +95,7 @@ assert req2["body"]["status"] == "pending", req2
 print("[OK] parse_request handles query params correctly")
 
 import base64
-csv_content = "id,ward_id,lat,lng,area_sqm,detection_type,confidence\nprop-x-1,1,17.7,83.3,200,new_build,0.8\n"
+csv_content = "property_id,ward_id,lat,lng,area_sqm,detection_type,confidence\nGVMC-001-0001,1,17.7,83.3,200,new_build,0.8\n"
 boundary = "----testboundary"
 body = (
     f"--{boundary}\r\n"
@@ -112,9 +115,10 @@ multipart_event = {
 req3 = request_handler.parse_request(multipart_event)
 rows = req3["body"]["_csv_rows"]
 assert len(rows) == 1, rows
+assert rows[0]["id"] == "GVMC-001-0001", rows
 assert rows[0]["ward_id"] == "1", rows
 assert rows[0]["area_sqm"] == 200, rows
-print(f"[OK] parse_request handles multipart CSV correctly: {rows}")
+print(f"[OK] parse_request handles multipart CSV correctly (property_id -> id): {rows}")
 
 if failures:
     print("\n=== FAILURES ===")

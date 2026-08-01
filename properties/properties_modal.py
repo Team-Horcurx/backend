@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 _COLUMNS = """
-    id, ward_id, lat, lng, area_sqm, detection_type, confidence, confidence_breakdown,
-    detected_at, s3_geojson_key, status, ai_explanation
+    id, ward_id, lat, lng, address, pincode, property_type, area_sqm, detection_type,
+    confidence, confidence_breakdown, ndbi_delta, area_delta, ndvi_drop, osm_status, db_match,
+    baseline_year, comparison_year, detected_at, s3_geojson_key, status,
+    estimated_annual_tax_inr, owner_name, ai_explanation
 """
 
 
@@ -18,13 +20,25 @@ def _row_to_property(r):
         "ward_id": r["ward_id"],
         "lat": float(r["lat"]),
         "lng": float(r["lng"]),
+        "address": r["address"],
+        "pincode": r["pincode"],
+        "property_type": r["property_type"],
         "area_sqm": r["area_sqm"],
         "detection_type": r["detection_type"],
         "confidence": float(r["confidence"]),
         "confidence_breakdown": cb,
+        "ndbi_delta": float(r["ndbi_delta"]) if r["ndbi_delta"] is not None else None,
+        "area_delta": float(r["area_delta"]) if r["area_delta"] is not None else None,
+        "ndvi_drop": float(r["ndvi_drop"]) if r["ndvi_drop"] is not None else None,
+        "osm_status": float(r["osm_status"]) if r["osm_status"] is not None else None,
+        "db_match": float(r["db_match"]) if r["db_match"] is not None else None,
+        "baseline_year": r["baseline_year"],
+        "comparison_year": r["comparison_year"],
         "detected_at": r["detected_at"].isoformat() + "Z" if isinstance(r["detected_at"], datetime) else r["detected_at"],
         "s3_geojson_key": r["s3_geojson_key"],
         "status": r["status"],
+        "estimated_annual_tax_inr": r["estimated_annual_tax_inr"],
+        "owner_name": r["owner_name"],
         "ai_explanation": r["ai_explanation"],
     }
 
@@ -71,22 +85,43 @@ def update_status(conn, property_id, status, notes, updated_by):
     return result.rowcount > 0
 
 
+_BULK_UPSERT_OPTIONAL_FIELDS = (
+    "address", "pincode", "property_type", "ndbi_delta", "area_delta", "ndvi_drop",
+    "osm_status", "db_match", "baseline_year", "comparison_year",
+    "estimated_annual_tax_inr", "owner_name",
+)
+
+
 def bulk_upsert(conn, rows):
     """rows: list of dicts with keys matching the properties columns (used by CSV import)."""
     count = 0
     for r in rows:
+        for field in _BULK_UPSERT_OPTIONAL_FIELDS:
+            r.setdefault(field, None)
+        r.setdefault("status", "pending")
         conn.execute(
             text("""
                 INSERT INTO properties
-                    (id, ward_id, lat, lng, area_sqm, detection_type, confidence,
-                     confidence_breakdown, detected_at, s3_geojson_key, status)
+                    (id, ward_id, lat, lng, address, pincode, property_type, area_sqm,
+                     detection_type, confidence, confidence_breakdown, ndbi_delta, area_delta,
+                     ndvi_drop, osm_status, db_match, baseline_year, comparison_year,
+                     detected_at, s3_geojson_key, status, estimated_annual_tax_inr, owner_name)
                 VALUES
-                    (:id, :ward_id, :lat, :lng, :area_sqm, :detection_type, :confidence,
-                     :confidence_breakdown, :detected_at, :s3_geojson_key, 'pending')
+                    (:id, :ward_id, :lat, :lng, :address, :pincode, :property_type, :area_sqm,
+                     :detection_type, :confidence, :confidence_breakdown, :ndbi_delta, :area_delta,
+                     :ndvi_drop, :osm_status, :db_match, :baseline_year, :comparison_year,
+                     :detected_at, :s3_geojson_key, :status, :estimated_annual_tax_inr, :owner_name)
                 ON DUPLICATE KEY UPDATE
-                    lat = VALUES(lat), lng = VALUES(lng), area_sqm = VALUES(area_sqm),
-                    detection_type = VALUES(detection_type), confidence = VALUES(confidence),
-                    confidence_breakdown = VALUES(confidence_breakdown), detected_at = VALUES(detected_at)
+                    lat = VALUES(lat), lng = VALUES(lng), address = VALUES(address),
+                    pincode = VALUES(pincode), property_type = VALUES(property_type),
+                    area_sqm = VALUES(area_sqm), detection_type = VALUES(detection_type),
+                    confidence = VALUES(confidence), confidence_breakdown = VALUES(confidence_breakdown),
+                    ndbi_delta = VALUES(ndbi_delta), area_delta = VALUES(area_delta),
+                    ndvi_drop = VALUES(ndvi_drop), osm_status = VALUES(osm_status),
+                    db_match = VALUES(db_match), baseline_year = VALUES(baseline_year),
+                    comparison_year = VALUES(comparison_year), detected_at = VALUES(detected_at),
+                    estimated_annual_tax_inr = VALUES(estimated_annual_tax_inr),
+                    owner_name = VALUES(owner_name)
             """),
             r,
         )

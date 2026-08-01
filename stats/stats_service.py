@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
+from ndbi.ndbi_validator import NdbiGridQuery
 from shared.bedrock_client import commissioner_brief
 
 AI_BRIEF_TTL_MINUTES = 10
@@ -46,6 +47,38 @@ def compute_stats(conn, ward_id=None):
         "pipeline_status": cfg.get("pipeline_status", "idle"),
         "last_refresh": cfg.get("last_refresh"),
         "ndbi_threshold": float(cfg.get("ndbi_threshold", 0.15)),
+    }
+
+
+def compute_comparison(conn, ward_id, baseline_year, comparison_year):
+    sql = """
+        SELECT
+            SUM(detection_type = 'new_build') AS new_structures,
+            SUM(detection_type = 'change_of_use') AS change_of_use,
+            SUM(CASE WHEN detection_type = 'new_build' THEN area_sqm ELSE 0 END) AS built_up_area_increase_sqm,
+            SUM(CASE WHEN status IN ('pending','underassessed') THEN area_sqm ELSE 0 END) AS estimated_assessable_area_sqm,
+            AVG(COALESCE(ndbi_delta, CAST(confidence_breakdown->>'$.ndbi_delta' AS DECIMAL(3,2)))) AS avg_ndbi_change,
+            SUM(CASE WHEN status IN ('pending','underassessed')
+                     THEN area_sqm * (CASE WHEN detection_type = 'new_build' THEN 80 ELSE 40 END)
+                     ELSE 0 END) AS estimated_tax_impact_inr
+        FROM properties
+        WHERE ward_id = :ward_id AND baseline_year = :baseline_year AND comparison_year = :comparison_year
+    """
+    row = conn.execute(
+        text(sql),
+        {"ward_id": ward_id, "baseline_year": baseline_year, "comparison_year": comparison_year},
+    ).mappings().first()
+
+    return {
+        "ward_id": ward_id,
+        "baseline_year": baseline_year,
+        "comparison_year": comparison_year,
+        "new_structures": int(row["new_structures"] or 0),
+        "change_of_use": int(row["change_of_use"] or 0),
+        "built_up_area_increase_sqm": int(row["built_up_area_increase_sqm"] or 0),
+        "estimated_assessable_area_sqm": int(row["estimated_assessable_area_sqm"] or 0),
+        "avg_ndbi_change": round(float(row["avg_ndbi_change"]), 3) if row["avg_ndbi_change"] is not None else 0.0,
+        "estimated_tax_impact_inr": int(row["estimated_tax_impact_inr"] or 0),
     }
 
 
@@ -102,3 +135,11 @@ class StatsService:
 
     def get_all_wards(self, obj, conn):
         return "success", compute_all_wards(conn)
+
+    def get_comparison(self, obj, conn):
+        query = NdbiGridQuery(
+            baseline_year=obj.get("baseline_year"),
+            comparison_year=obj.get("comparison_year"),
+        )
+        query.validate_years()
+        return "success", compute_comparison(conn, obj["wardId"], query.baseline_year, query.comparison_year)
